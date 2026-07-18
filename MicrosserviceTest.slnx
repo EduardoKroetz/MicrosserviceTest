@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="NotificationService.Worker/NotificationService.Worker.csproj" />
+  <Project Path="OrderService.Api/OrderService.Api.csproj" />
+  <Project Path="PaymentService.Worker/PaymentService.Worker.csproj" />
+</Solution>
