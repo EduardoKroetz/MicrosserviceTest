@@ -1,5 +1,10 @@
 <Solution>
-  <Project Path="NotificationService.Worker/NotificationService.Worker.csproj" />
-  <Project Path="OrderService.Api/OrderService.Api.csproj" />
-  <Project Path="PaymentService.Worker/PaymentService.Worker.csproj" />
+  <Folder Name="/Itens de Solução/">
+    <File Path="docker-compose.yml" />
+    <File Path="readme.md" />
+  </Folder>
+  <Project Path="D:/Dev/Projects/MicrosserviceTest/NotificationService.Worker/NotificationService.Worker.csproj" />
+  <Project Path="D:/Dev/Projects/MicrosserviceTest/OrderService.Api/OrderService.Api.csproj" />
+  <Project Path="D:/Dev/Projects/MicrosserviceTest/PaymentService.Worker/PaymentService.Worker.csproj" />
+  <Project Path="D:/Dev/Projects/MicrosserviceTest/Shared.Contracts/Shared.Contracts.csproj" Id="1bbd75a1-8ed6-4c6e-9cf2-b46c18fe8eeb" />
 </Solution>
