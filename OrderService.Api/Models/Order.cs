@@ -11,7 +11,6 @@ public class Order
 public enum OrderStatus
 {
     Pending,
-    Processing,
-    Completed,
+    Confirmed,
     Cancelled
 }

@@ -4,6 +4,8 @@
 ## Get latest from `dotnet new gitignore`
 
 *.db
+*.db-shm
+*.db-wal
 
 # dotenv files
 .env
