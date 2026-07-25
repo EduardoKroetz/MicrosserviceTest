@@ -1,3 +1,4 @@
+using BuildingBlocks;
 using Microsoft.EntityFrameworkCore;
 using OrderService.Api;
 using OrderService.Api.Data;
@@ -29,6 +30,7 @@ builder.Services.AddSingleton<IConnection>(sp =>
     return factory.CreateConnectionAsync().GetAwaiter().GetResult();
 });
 
+builder.Services.AddSingleton<IMessageBusConnection, RabbitMqConnection>();
 builder.Services.AddSingleton<OrderPublisher>();
 
 builder.Services.AddScoped<CreateOrderHandler>();
