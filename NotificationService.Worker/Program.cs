@@ -1,3 +1,4 @@
+using BuildingBlocks;
 using NotificationService.Worker;
 using NotificationService.Worker.Handlers;
 using RabbitMQ.Client;
@@ -15,6 +16,8 @@ builder.Services.AddSingleton<IConnection>(sp =>
     };
     return factory.CreateConnectionAsync().GetAwaiter().GetResult();
 });
+
+builder.Services.AddSingleton<IMessageBusConnection, RabbitMqConnection>();
 
 builder.Services.AddScoped<PaymentApprovedHandler>();
 builder.Services.AddScoped<PaymentRejectedHandler>();

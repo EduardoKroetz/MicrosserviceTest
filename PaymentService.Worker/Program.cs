@@ -1,3 +1,4 @@
+using BuildingBlocks;
 using PaymentService.Worker;
 using RabbitMQ.Client;
 
@@ -17,6 +18,8 @@ builder.Services.AddSingleton<IConnection>(sp =>
     };
     return factory.CreateConnectionAsync().GetAwaiter().GetResult();
 });
+
+builder.Services.AddSingleton<IMessageBusConnection, RabbitMqConnection>();
 
 var host = builder.Build();
 

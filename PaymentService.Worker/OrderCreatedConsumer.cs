@@ -1,4 +1,4 @@
-using RabbitMQ.Client;
+using BuildingBlocks;
 using RabbitMQ.Client.Events;
 using Shared.Contracts;
 using System.Text.Json;
@@ -7,35 +7,30 @@ namespace PaymentService.Worker;
 
 public class OrderCreatedConsumer : BackgroundService
 {
-    private readonly IConnection _connection;
     private readonly ILogger<OrderCreatedConsumer> _logger;
     private readonly PaymentPublisher _paymentPublisher;
-    private IChannel? _channel;
+    private readonly IMessageBusConnection _messageBusConnection;
 
     private const string Exchange = "order.exchange";
     private const string Queue = "order.created.payments";
+    private const string Event = "order.created";
 
-    public OrderCreatedConsumer(IConnection connection, ILogger<OrderCreatedConsumer> logger, PaymentPublisher paymentPublisher)
+    public OrderCreatedConsumer(ILogger<OrderCreatedConsumer> logger, PaymentPublisher paymentPublisher, IMessageBusConnection messageBusConnection)
     {
-        _connection = connection;
         _logger = logger;
         _paymentPublisher = paymentPublisher;
+        _messageBusConnection = messageBusConnection;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        _channel = await _connection.CreateChannelAsync(cancellationToken: ct);
-
-        await _channel.ExchangeDeclareAsync(Exchange, ExchangeType.Topic, durable: true, autoDelete: false, cancellationToken: ct);
-
-        await _channel.QueueDeclareAsync(Queue, durable: true, exclusive: false, autoDelete: false, cancellationToken: ct);
-
-        await _channel.QueueBindAsync(Queue, Exchange, "order.created", cancellationToken: ct);
-
-        var consumer = new AsyncEventingBasicConsumer(_channel);
-        consumer.ReceivedAsync += OnMessageAsync;
-
-        await _channel.BasicConsumeAsync(Queue, autoAck: false, consumer: consumer, cancellationToken: ct);
+        await _messageBusConnection.ConsumeAsync(
+            eventHandler: OnMessageAsync,
+            exchange: Exchange,
+            queue: Queue,
+            routingKey: Event,
+            ct: ct
+        );
     }
 
     private async Task OnMessageAsync(object sender, BasicDeliverEventArgs ea)

@@ -1,4 +1,5 @@
 ﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 using Shared.Contracts;
 using System.Text.Json;
 
@@ -31,7 +32,8 @@ public class RabbitMqConnection : IMessageBusConnection
             var channel = await _connection.CreateChannelAsync(
                 new CreateChannelOptions(
                     publisherConfirmationsEnabled: true,
-                    publisherConfirmationTrackingEnabled: true),
+                    publisherConfirmationTrackingEnabled: true,
+                    consumerDispatchConcurrency: 10),
                 ct);
 
             _channel = channel;
@@ -72,6 +74,22 @@ public class RabbitMqConnection : IMessageBusConnection
             basicProperties: props,
             body: body,
             cancellationToken: ct);
+    }
+
+    public async Task ConsumeAsync(AsyncEventHandler<BasicDeliverEventArgs> eventHandler, string exchange, string queue, string routingKey, CancellationToken ct)
+    {
+        var channel = await GetChannelAsync(exchange, ct);
+
+        await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false, cancellationToken: ct);
+
+        await channel.QueueBindAsync(queue, exchange, routingKey: routingKey, cancellationToken: ct);
+
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += eventHandler;
+
+        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 10, global: false, ct);
+
+        await channel.BasicConsumeAsync(queue, autoAck: false, consumer: consumer, cancellationToken: ct);
     }
 
     public async ValueTask DisposeAsync()

@@ -5,11 +5,11 @@ namespace OrderService.Api;
 
 public class OrderPublisher
 {
-    private readonly IMessageBusConnection _messageBus;
+    private readonly IMessageBusConnection _messageBusConnection;
 
     public OrderPublisher(IMessageBusConnection connection)
     {
-        _messageBus = connection;
+        _messageBusConnection = connection;
     }
 
     private const string Exchange = "order.exchange";
@@ -17,6 +17,6 @@ public class OrderPublisher
 
     public async Task PublishOrderCreatedEventAsync(OrderCreatedEvent orderCreatedEvent, CancellationToken ct)
     {
-        await _messageBus.PublishAsync(orderCreatedEvent, RoutingKey, Exchange, ct);
+        await _messageBusConnection.PublishAsync(orderCreatedEvent, RoutingKey, Exchange, ct);
     }
 }
