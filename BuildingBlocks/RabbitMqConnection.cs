@@ -16,7 +16,7 @@ public class RabbitMqConnection : IMessageBusConnection
         _connection = connection;
     }
 
-    private async Task<IChannel> GetChannelAsync(string exchange, CancellationToken ct)
+    private async Task<IChannel> GetChannelAsync(CancellationToken ct)
     {
         // 1º check: barato, sem trava — o caminho comum não paga nada
         if (_channel is { IsOpen: true })
@@ -33,7 +33,7 @@ public class RabbitMqConnection : IMessageBusConnection
                 new CreateChannelOptions(
                     publisherConfirmationsEnabled: true,
                     publisherConfirmationTrackingEnabled: true,
-                    consumerDispatchConcurrency: 10),
+                    consumerDispatchConcurrency: 30),
                 ct);
 
             _channel = channel;
@@ -47,7 +47,7 @@ public class RabbitMqConnection : IMessageBusConnection
 
     public async Task PublishAsync(Event ev, string routingKey, string exchange, CancellationToken ct)
     {
-        var channel = await GetChannelAsync(exchange, ct);
+        var channel = await GetChannelAsync(ct);
 
         await channel.ExchangeDeclareAsync(
             exchange: exchange,
@@ -78,7 +78,7 @@ public class RabbitMqConnection : IMessageBusConnection
 
     public async Task ConsumeAsync(AsyncEventHandler<BasicDeliverEventArgs> eventHandler, string exchange, string queue, string routingKey, CancellationToken ct)
     {
-        var channel = await GetChannelAsync(exchange, ct);
+        var channel = await GetChannelAsync(ct);
 
         await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false, cancellationToken: ct);
 
@@ -87,7 +87,7 @@ public class RabbitMqConnection : IMessageBusConnection
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += eventHandler;
 
-        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 10, global: false, ct);
+        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 30, global: false, ct);
 
         await channel.BasicConsumeAsync(queue, autoAck: false, consumer: consumer, cancellationToken: ct);
     }

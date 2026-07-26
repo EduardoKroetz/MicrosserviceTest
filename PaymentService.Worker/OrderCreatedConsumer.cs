@@ -1,4 +1,5 @@
 using BuildingBlocks;
+using PaymentService.Worker.Handlers;
 using RabbitMQ.Client.Events;
 using Shared.Contracts;
 using System.Text.Json;
@@ -8,18 +9,18 @@ namespace PaymentService.Worker;
 public class OrderCreatedConsumer : BackgroundService
 {
     private readonly ILogger<OrderCreatedConsumer> _logger;
-    private readonly PaymentPublisher _paymentPublisher;
     private readonly IMessageBusConnection _messageBusConnection;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private const string Exchange = "order.exchange";
     private const string Queue = "order.created.payments";
     private const string Event = "order.created";
 
-    public OrderCreatedConsumer(ILogger<OrderCreatedConsumer> logger, PaymentPublisher paymentPublisher, IMessageBusConnection messageBusConnection)
+    public OrderCreatedConsumer(ILogger<OrderCreatedConsumer> logger, IMessageBusConnection messageBusConnection, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
-        _paymentPublisher = paymentPublisher;
         _messageBusConnection = messageBusConnection;
+        _scopeFactory = scopeFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -47,20 +48,9 @@ public class OrderCreatedConsumer : BackgroundService
                 return;
             }
 
-            const int minTotalAmount = 100;
-
-            await Task.Delay(3000);
-
-            if (ev.TotalAmount < minTotalAmount) // Exemplo de validação fictícia: rejeitar pagamentos com valor total menor que 100
-            {
-                var paymentRejectedEvent = new PaymentRejectedEvent(ev.OrderId, $"The total value must be greater than or equal to {minTotalAmount}.");
-                await _paymentPublisher.PublishPaymentRejectedEventAsync(paymentRejectedEvent, CancellationToken.None);
-            }
-            else
-            {
-                var paymentApprovedEvent = new PaymentApprovedEvent(ev.OrderId);
-                await _paymentPublisher.PublishPaymentApprovedEventAsync(paymentApprovedEvent, CancellationToken.None);
-            }
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<OrderCreatedHandler>();
+            await handler.HandleAsync(ev);
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
         }
@@ -71,7 +61,7 @@ public class OrderCreatedConsumer : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
-            await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+            await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
         }
     }
 }
