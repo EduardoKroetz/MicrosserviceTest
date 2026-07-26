@@ -39,7 +39,8 @@ public class OrderCreatedHandler
 
             Event? outboxEvent = null;
 
-            if (ev.TotalAmount < minTotalAmount) // Exemplo de validação: rejeitar pagamentos com valor total menor que 100
+            var isApproved = new Random().Next(0, 2) == 0; // Simula aprovação ou rejeição aleatória do pagamento
+            if (isApproved)
             {
                 var paymentRejectedEvent = new PaymentRejectedEvent(ev.OrderId, $"The total value must be greater than or equal to {minTotalAmount}.");
                 outboxEvent = paymentRejectedEvent;

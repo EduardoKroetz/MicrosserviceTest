@@ -11,6 +11,7 @@ public class OrderDbContext : DbContext
     }
 
     public DbSet<Order> Orders { get; set; }
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,13 @@ public class OrderDbContext : DbContext
             entity.Property(e => e.OrderDate).IsRequired();
             entity.Property(e => e.TotalAmount).IsRequired().HasColumnType("decimal(18,2)");
             entity.Property(e => e.Status).IsRequired().HasConversion<string>();
+        });
+
+        modelBuilder.Entity<OutboxMessage>(builder =>
+        {
+            builder.HasKey(e => e.EventId);
+            builder.Property(e => e.Type).IsRequired();
+            builder.Property(e => e.Content).IsRequired();
         });
     }
 }

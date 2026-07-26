@@ -16,7 +16,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 builder.Services.AddDbContext<OrderDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<IConnection>(sp =>
 {
@@ -31,7 +31,6 @@ builder.Services.AddSingleton<IConnection>(sp =>
 });
 
 builder.Services.AddSingleton<IMessageBusConnection, RabbitMqConnection>();
-builder.Services.AddSingleton<OrderPublisher>();
 
 builder.Services.AddScoped<CreateOrderHandler>();
 builder.Services.AddScoped<GetOrderHandler>();
@@ -40,6 +39,8 @@ builder.Services.AddScoped<PaymentRejectedHandler>();
 
 builder.Services.AddHostedService<PaymentApprovedConsumer>();
 builder.Services.AddHostedService<PaymentRejectedConsumer>();
+
+builder.Services.AddHostedService<OutboxProcessor>();
 
 var app = builder.Build();
 
