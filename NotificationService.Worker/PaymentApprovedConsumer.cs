@@ -13,7 +13,7 @@ public class PaymentApprovedConsumer : BackgroundService
     private readonly IMessageBusConnection _messageBusConnection;
 
     private const string Exchange = "payment.exchange";
-    private const string Queue = "payment.approved.orders";
+    private const string Queue = "payment.approved.notifications";
     private const string Event = "payment.approved";
 
     public PaymentApprovedConsumer(ILogger<PaymentApprovedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
@@ -50,7 +50,7 @@ public class PaymentApprovedConsumer : BackgroundService
 
             using var scope = _serviceScopeFactory.CreateScope();
             var paymentApprovedHandler = scope.ServiceProvider.GetRequiredService<PaymentApprovedHandler>();
-            await paymentApprovedHandler.HandleAsync(ev);
+            await paymentApprovedHandler.HandleAsync(ev, ea.CancellationToken);
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
         }

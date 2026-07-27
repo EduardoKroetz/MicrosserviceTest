@@ -26,9 +26,19 @@ public class PaymentApprovedHandler(OrderDbContext dbContext, ILogger<PaymentApp
 
             order.Status = OrderStatus.Confirmed;
 
-            await dbContext.SaveChangesAsync(ct);
+            // Adiciona o registro do evento processado para garantir idempotência
+            var processedEvent = new ProcessedEvent
+            {
+                EventId = ev.EventId,
+                Name = nameof(OrderCreatedEvent),
+                CreatedAt = DateTime.UtcNow
+            };
 
+            dbContext.ProcessedEvents.Add(processedEvent);
+            await dbContext.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+
+            logger.LogInformation("Event {EventId} processed successfully.", ev.EventId);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" }) // 23505 é o código de erro do PostgreSQL para violação de chave primária
         {

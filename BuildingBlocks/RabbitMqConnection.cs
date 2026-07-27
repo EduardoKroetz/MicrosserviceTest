@@ -18,14 +18,12 @@ public class RabbitMqConnection : IMessageBusConnection
 
     private async Task<IChannel> GetChannelAsync(CancellationToken ct)
     {
-        // 1º check: barato, sem trava — o caminho comum não paga nada
         if (_channel is { IsOpen: true })
             return _channel;
 
         await _gate.WaitAsync(ct);
         try
         {
-            // 2º check: dentro da trava. Se A criou enquanto B esperava, B reusa.
             if (_channel is { IsOpen: true })
                 return _channel;
 

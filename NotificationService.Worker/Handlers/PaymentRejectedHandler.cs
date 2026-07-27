@@ -1,13 +1,53 @@
-﻿using Shared.Contracts;
+﻿using Microsoft.EntityFrameworkCore;
+using NotificationService.Worker.Data;
+using NotificationService.Worker.Models;
+using Npgsql;
+using Shared.Contracts;
 
 namespace NotificationService.Worker.Handlers;
 
-public class PaymentRejectedHandler
+public class PaymentRejectedHandler(NotificationDbContext dbContext, ILogger<PaymentRejectedHandler> logger)
 {
-    public async Task HandleAsync(PaymentRejectedEvent ev)
+    public async Task HandleAsync(PaymentRejectedEvent ev, CancellationToken ct)
     {
-        var message = $"O pagamento da ordem {ev.OrderId} foi rejeitado. Motivo: {ev.Reason}.";
+        // Validação de idempotência: verifica se o evento já foi processado
+        if (await dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId, ct))
+        {
+            logger.LogInformation("Event {EventId} already processed. Skipping.", ev.EventId);
+            return;
+        }
 
-        Console.WriteLine(message);
+        var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            logger.LogInformation("Notifying client about payment rejection for OrderId {OrderId}.", ev.OrderId);
+
+            // Adiciona o registro do evento processado para garantir idempotência
+            var processedEvent = new ProcessedEvent
+            {
+                EventId = ev.EventId,
+                Name = nameof(OrderCreatedEvent),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            dbContext.ProcessedEvents.Add(processedEvent);
+            await dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            logger.LogInformation("Event {EventId} processed successfully.", ev.EventId);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" }) // 23505 é o código de erro do PostgreSQL para violação de chave primária
+        {
+            logger.LogError("Event with ID {EventId} already processed.", ev.EventId);
+            await transaction.RollbackAsync(ct);
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error processing event with ID {EventId}.", ev.EventId);
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
     }
 }
