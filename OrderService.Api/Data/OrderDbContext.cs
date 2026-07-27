@@ -12,6 +12,7 @@ public class OrderDbContext : DbContext
 
     public DbSet<Order> Orders { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
+    public DbSet<ProcessedEvent> ProcessedEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,13 @@ public class OrderDbContext : DbContext
             builder.HasKey(e => e.EventId);
             builder.Property(e => e.Type).IsRequired();
             builder.Property(e => e.Content).IsRequired();
+        });
+
+        modelBuilder.Entity<ProcessedEvent>(builder =>
+        {
+            builder.HasKey(e => e.EventId);
+            builder.Property(e => e.Name).IsRequired();
+            builder.Property(e => e.CreatedAt).IsRequired();
         });
     }
 }

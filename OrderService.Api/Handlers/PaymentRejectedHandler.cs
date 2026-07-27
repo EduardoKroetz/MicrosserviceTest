@@ -1,20 +1,46 @@
-﻿using OrderService.Api.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using OrderService.Api.Data;
 using OrderService.Api.Models;
 using Shared.Contracts;
 
 namespace OrderService.Api.Handlers;
 
-public class PaymentRejectedHandler(OrderDbContext dbContext)
+public class PaymentRejectedHandler(OrderDbContext dbContext, ILogger<PaymentRejectedHandler> logger)
 {
     public async Task HandleAsync(PaymentRejectedEvent ev, CancellationToken ct)
     {
-        // TODO: Implementar idempotencia
+        // Validação de idempotência: verifica se o evento já foi processado
+        if (await dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId, ct))
+        {
+            logger.LogInformation("Event {EventId} already processed. Skipping.", ev.EventId);
+            return;
+        }
 
-        var order = await dbContext.Orders.FindAsync(ev.OrderId)
-            ?? throw new InvalidOperationException("Order not found");
+        var transaction = await dbContext.Database.BeginTransactionAsync(ct);
 
-        order.Status = OrderStatus.Cancelled;
+        try
+        {
+            var order = await dbContext.Orders.FindAsync(ev.OrderId)
+                ?? throw new InvalidOperationException("Order not found");
 
-        await dbContext.SaveChangesAsync(ct); // E se der erro no save changes? Oq acontece?
+            order.Status = OrderStatus.Cancelled;
+
+            await dbContext.SaveChangesAsync(ct);
+
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" }) // 23505 é o código de erro do PostgreSQL para violação de chave primária
+        {
+            logger.LogError("Event with ID {EventId} already processed.", ev.EventId);
+            await transaction.RollbackAsync(ct);
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error processing event with ID {EventId}.", ev.EventId);
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
     }
 }
