@@ -61,7 +61,7 @@ public class PaymentApprovedConsumer : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
-            await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+            await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
         }
     }
 }
