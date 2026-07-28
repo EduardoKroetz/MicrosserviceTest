@@ -78,6 +78,13 @@ public class RabbitMqConnection : IMessageBusConnection
     {
         var channel = await GetChannelAsync(ct);
 
+        await channel.ExchangeDeclareAsync(
+            exchange: exchange,
+            type: ExchangeType.Topic,
+            durable: true,
+            autoDelete: false,
+            cancellationToken: ct);
+
         await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false, cancellationToken: ct);
 
         await channel.QueueBindAsync(queue, exchange, routingKey: routingKey, cancellationToken: ct);
