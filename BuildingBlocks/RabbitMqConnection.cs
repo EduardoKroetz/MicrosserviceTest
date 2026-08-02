@@ -31,7 +31,7 @@ public class RabbitMqConnection : IMessageBusConnection
                 new CreateChannelOptions(
                     publisherConfirmationsEnabled: true,
                     publisherConfirmationTrackingEnabled: true,
-                    consumerDispatchConcurrency: 30),
+                    consumerDispatchConcurrency: 100),
                 ct);
 
             _channel = channel;

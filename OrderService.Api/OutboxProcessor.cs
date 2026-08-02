@@ -24,7 +24,7 @@ public class OutboxProcessor : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         const int maxRetryCount = 5;
-        const int maxLimitMessages = 100;
+        const int maxLimitMessages = 500;
         const string exchange = "order.exchange";
 
         while (!stoppingToken.IsCancellationRequested)
