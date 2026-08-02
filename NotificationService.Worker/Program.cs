@@ -3,12 +3,27 @@ using Microsoft.EntityFrameworkCore;
 using NotificationService.Worker;
 using NotificationService.Worker.Data;
 using NotificationService.Worker.Handlers;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using RabbitMQ.Client;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddDbContext<NotificationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(x => x.AddService("NotificationService"))
+    .WithTracing(tracing => tracing
+        .AddSource("NotificationService.PaymentApprovedConsumer")
+        .AddSource("NotificationService.PaymentRejectedConsumer")
+        .AddSource("NotificationService.PaymentApprovedHandler")
+        .AddSource("NotificationService.PaymentRejectedHandler")
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+        }));
+
 
 builder.Services.AddSingleton<IConnection>(sp =>
 {

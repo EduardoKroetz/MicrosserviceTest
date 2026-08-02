@@ -2,6 +2,7 @@
 using NotificationService.Worker.Handlers;
 using RabbitMQ.Client.Events;
 using Shared.Contracts;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace NotificationService.Worker;
@@ -15,6 +16,8 @@ public class PaymentRejectedConsumer : BackgroundService
     private const string Exchange = "payment.exchange";
     private const string Queue = "payment.rejected.notifications";
     private const string Event = "payment.rejected";
+
+    private static readonly ActivitySource ActivitySource = new("NotificationService.PaymentRejectedConsumer");
 
     public PaymentRejectedConsumer(ILogger<PaymentRejectedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
     {
@@ -39,6 +42,8 @@ public class PaymentRejectedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
+        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentApprovedEvent", ActivitySource);
+
         try
         {
             var ev = JsonSerializer.Deserialize<PaymentRejectedEvent>(ea.Body.ToArray());
@@ -54,13 +59,15 @@ public class PaymentRejectedConsumer : BackgroundService
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
         }
     }

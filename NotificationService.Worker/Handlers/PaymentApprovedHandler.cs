@@ -3,13 +3,18 @@ using NotificationService.Worker.Data;
 using NotificationService.Worker.Models;
 using Npgsql;
 using Shared.Contracts;
+using System.Diagnostics;
 
 namespace NotificationService.Worker.Handlers;
 
 public class PaymentApprovedHandler(NotificationDbContext dbContext, ILogger<PaymentApprovedHandler> logger)
 {
+    private static readonly ActivitySource ActivitySource = new("NotificationService.PaymentApprovedHandler");
+
     public async Task HandleAsync(PaymentApprovedEvent ev, CancellationToken ct)
     {
+        using var activity = ActivitySource.StartActivity("Handle PaymentApprovedEvent", ActivityKind.Internal);
+
         // Validação de idempotência: verifica se o evento já foi processado
         if (await dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId, ct))
         {
@@ -46,6 +51,7 @@ public class PaymentApprovedHandler(NotificationDbContext dbContext, ILogger<Pay
         catch (Exception ex)
         {
             logger.LogError(ex, "Error processing event with ID {EventId}.", ev.EventId);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await transaction.RollbackAsync(ct);
             throw;
         }
