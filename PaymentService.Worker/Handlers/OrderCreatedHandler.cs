@@ -3,6 +3,7 @@ using Npgsql;
 using PaymentService.Worker.Data;
 using PaymentService.Worker.Models;
 using Shared.Contracts;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace PaymentService.Worker.Handlers;
@@ -12,6 +13,8 @@ public class OrderCreatedHandler
     private readonly PaymentDbContext _dbContext;
     private readonly ILogger<OrderCreatedHandler> _logger;
 
+    private static readonly ActivitySource ActivitySource = new("PaymentService.OrderCreatedHandler");
+
     public OrderCreatedHandler(PaymentDbContext dbContext, ILogger<OrderCreatedHandler> logger)
     {
         _dbContext = dbContext;
@@ -20,6 +23,8 @@ public class OrderCreatedHandler
 
     public async Task HandleAsync(OrderCreatedEvent ev)
     {
+        using var activity = ActivitySource.StartActivity("Handle OrderCreatedEvent", ActivityKind.Internal);
+
         // Validação de idempotência: verifica se o evento já foi processado
         var eventAlreadyProcessed = await _dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId);
         if (eventAlreadyProcessed)
@@ -57,7 +62,8 @@ public class OrderCreatedHandler
                 EventId = outboxEvent.EventId,
                 Type = outboxEvent.GetType().Name,
                 Content = JsonSerializer.Serialize(outboxEvent, outboxEvent.GetType()),
-                OccurredOnUtc = DateTime.UtcNow
+                OccurredOnUtc = DateTime.UtcNow,
+                TraceParent = activity?.Id
             };
 
             _dbContext.OutboxMessages.Add(outboxMessage);
@@ -80,12 +86,14 @@ public class OrderCreatedHandler
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" }) // 23505 é o código de erro do PostgreSQL para violação de chave primária
         {
             _logger.LogError("Event with ID {EventId} already processed.", ev.EventId);
+            activity?.SetStatus(ActivityStatusCode.Unset);
             await transaction.RollbackAsync();
             return;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing event with ID {EventId}.", ev.EventId);
+            activity?.SetStatus(ActivityStatusCode.Error);
             await transaction.RollbackAsync();
 
             throw;

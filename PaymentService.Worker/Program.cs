@@ -1,5 +1,7 @@
 using BuildingBlocks;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using PaymentService.Worker;
 using PaymentService.Worker.Data;
 using PaymentService.Worker.Handlers;
@@ -11,6 +13,17 @@ builder.Services.AddHostedService<OutboxProcessor>();
 
 builder.Services.AddDbContext<PaymentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(x => x.AddService("PaymentService"))
+    .WithTracing(tracing => tracing
+        .AddSource("PaymentService.OrderCreatedConsumer")
+        .AddSource("PaymentService.OrderCreatedHandler")
+        .AddSource("PaymentService.OutboxProcessor")
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+        }));
 
 builder.Services.AddSingleton<IConnection>(sp =>
 {
