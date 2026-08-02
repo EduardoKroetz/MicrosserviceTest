@@ -26,6 +26,10 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddSource("OrderService.Outbox")
+        .AddSource("OrderService.PaymentApprovedConsumer")
+        .AddSource("OrderService.PaymentRejectedConsumer")
+        .AddSource("OrderService.PaymentApprovedHandler")
+        .AddSource("OrderService.PaymentRejectedHandler")
         .AddOtlpExporter(options =>
         {
             options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));

@@ -2,6 +2,7 @@
 using OrderService.Api.Handlers;
 using RabbitMQ.Client.Events;
 using Shared.Contracts;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace OrderService.Api;
@@ -15,6 +16,8 @@ public class PaymentApprovedConsumer : BackgroundService
     private const string Exchange = "payment.exchange";
     private const string Queue = "payment.approved.orders";
     private const string Event = "payment.approved";
+
+    private static readonly ActivitySource ActivitySource = new("OrderService.PaymentApprovedConsumer");
 
     public PaymentApprovedConsumer(ILogger<PaymentApprovedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
     {
@@ -39,10 +42,12 @@ public class PaymentApprovedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
+        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentApprovedEvent", ActivitySource);
+
         try
         {
-            var ev = JsonSerializer.Deserialize<PaymentApprovedEvent>(ea.Body.ToArray());
-            if (ev is null || string.IsNullOrEmpty(messageId))
+            var ev = ea.DeserializeEvent<PaymentApprovedEvent>();
+            if (ev is null || string.IsNullOrEmpty(messageId) || ev.OrderId == Guid.Empty)
             {
                 await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                 return;
@@ -54,13 +59,15 @@ public class PaymentApprovedConsumer : BackgroundService
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
         }
     }

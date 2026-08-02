@@ -3,13 +3,18 @@ using Npgsql;
 using OrderService.Api.Data;
 using OrderService.Api.Models;
 using Shared.Contracts;
+using System.Diagnostics;
 
 namespace OrderService.Api.Handlers;
 
 public class PaymentApprovedHandler(OrderDbContext dbContext, ILogger<PaymentApprovedHandler> logger)
 {
+    private static readonly ActivitySource ActivitySource = new("OrderService.PaymentApprovedHandler");
+
     public async Task HandleAsync(PaymentApprovedEvent ev, CancellationToken ct)
     {
+        using var activity = ActivitySource.StartActivity("Handle PaymentApprovedEvent", ActivityKind.Internal);
+
         // Validação de idempotência: verifica se o evento já foi processado
         if (await dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId, ct))
         {
@@ -49,6 +54,7 @@ public class PaymentApprovedHandler(OrderDbContext dbContext, ILogger<PaymentApp
         catch (Exception ex)
         {
             logger.LogError(ex, "Error processing event with ID {EventId}.", ev.EventId);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await transaction.RollbackAsync(ct);
             throw;
         }

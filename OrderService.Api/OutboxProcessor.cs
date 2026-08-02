@@ -45,8 +45,7 @@ public class OutboxProcessor : BackgroundService
                     _logger.LogWarning("Failed to parse TraceParent for message {EventId}. Starting a new activity.", message.EventId);
                 }
 
-                using var activity = ActivitySource.StartActivity(ActivityKind.Producer, activityContext);
-                var error = false;
+                using var activity = ActivitySource.StartActivity("Publish OrderCreatedEvent", ActivityKind.Producer, activityContext);
 
                 try
                 {
@@ -56,7 +55,7 @@ public class OutboxProcessor : BackgroundService
                         _ => throw new InvalidOperationException($"Unknown event type: {message.Type}")
                     };
 
-                    await _messageBusConnection.PublishAsync(ev, routingKey, exchange, stoppingToken);
+                    await _messageBusConnection.PublishAsync(ev, routingKey, exchange, stoppingToken, activity?.Id);
 
                     message.ProcessedOnUtc = DateTime.UtcNow;
 
@@ -66,13 +65,13 @@ public class OutboxProcessor : BackgroundService
                 {
                     message.RetryCount = maxRetryCount;
                     message.Error = ex.Message;
-                    error = true;
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     message.RetryCount++;
                     message.Error = ex.Message;
-                    error = true;
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                     _logger.LogError(ex, "Failed to publish event {EventType} with ID {EventId}. Retry count: {RetryCount}", message.Type, message.EventId, message.RetryCount);
                 }
 
@@ -83,13 +82,8 @@ public class OutboxProcessor : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    error = true;
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                     _logger.LogError(ex, "Failed to save changes for OutboxMessage with ID {EventId}.", message.EventId);
-                }
-
-                if (error)
-                {
-                    activity?.SetStatus(ActivityStatusCode.Error);
                 }
             }
 
