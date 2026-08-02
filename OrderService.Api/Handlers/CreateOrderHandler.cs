@@ -2,6 +2,7 @@
 using OrderService.Api.DTOs;
 using OrderService.Api.Models;
 using Shared.Contracts;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace OrderService.Api.Handlers;
@@ -32,7 +33,8 @@ public class CreateOrderHandler(OrderDbContext dbContext)
                 EventId = orderCreatedEvent.EventId,
                 Type = orderCreatedEvent.GetType().Name,
                 Content = JsonSerializer.Serialize(orderCreatedEvent),
-                OccurredOnUtc = DateTime.UtcNow
+                OccurredOnUtc = DateTime.UtcNow,
+                TraceParent = Activity.Current?.Id
             };
 
             dbContext.OutboxMessages.Add(outboxMessage);

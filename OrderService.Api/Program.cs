@@ -1,5 +1,7 @@
 using BuildingBlocks;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using OrderService.Api;
 using OrderService.Api.Data;
 using OrderService.Api.DTOs;
@@ -17,6 +19,17 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddDbContext<OrderDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(x => x.AddService("OrderService"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddSource("OrderService.Outbox")
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+        }));
 
 builder.Services.AddSingleton<IConnection>(sp =>
 {
