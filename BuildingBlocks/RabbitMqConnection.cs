@@ -43,7 +43,7 @@ public class RabbitMqConnection : IMessageBusConnection
         }
     }
 
-    public async Task PublishAsync(Event ev, string routingKey, string exchange, CancellationToken ct)
+    public async Task PublishAsync(Event ev, string routingKey, string exchange, CancellationToken ct, string? traceparent = null)
     {
         var channel = await GetChannelAsync(ct);
 
@@ -62,7 +62,11 @@ public class RabbitMqConnection : IMessageBusConnection
             ContentType = "application/json",
             DeliveryMode = DeliveryModes.Persistent,
             Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
-            Type = ev.GetType().Name
+            Type = ev.GetType().Name,
+            Headers = new Dictionary<string, object?>
+            {
+                { "traceparent", traceparent }
+            }
         };
 
         await channel.BasicPublishAsync(
