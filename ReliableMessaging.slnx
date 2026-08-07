@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/Itens de Solução/">
     <File Path="docker-compose.yml" />
+    <File Path="otel-collector.yml" />
+    <File Path="prometheus.yml" />
     <File Path="Readme.md" />
   </Folder>
   <Project Path="BuildingBlocks/BuildingBlocks.csproj" Id="0bafa74a-bd44-4761-acf6-e00414e1e45e" />
