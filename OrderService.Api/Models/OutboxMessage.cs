@@ -10,4 +10,5 @@ public class OutboxMessage
     public string? Error { get; set; }
     public int RetryCount { get; set; }
     public string? TraceParent { get; set; }
+    public DateTime? JourneyStartedAtUtc { get; set; }
 }

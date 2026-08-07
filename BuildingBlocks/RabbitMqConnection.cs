@@ -43,7 +43,7 @@ public class RabbitMqConnection : IMessageBusConnection
         }
     }
 
-    public async Task PublishAsync(Event ev, string routingKey, string exchange, CancellationToken ct, string? traceparent = null)
+    public async Task PublishAsync(Event ev, string routingKey, string exchange, CancellationToken ct, string? traceparent = null, DateTime? journeyStartedAtUtc = null)
     {
         var channel = await GetChannelAsync(ct);
 
@@ -65,7 +65,8 @@ public class RabbitMqConnection : IMessageBusConnection
             Type = ev.GetType().Name,
             Headers = new Dictionary<string, object?>
             {
-                { "traceparent", traceparent }
+                { "traceparent", traceparent },
+                { "journeyStartedAtUtc", journeyStartedAtUtc?.ToString("o")  }
             }
         };
 

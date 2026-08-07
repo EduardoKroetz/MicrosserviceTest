@@ -11,6 +11,7 @@ public class CreateOrderHandler(OrderDbContext dbContext)
 {
     public async Task<Order> HandleAsync(CreateOrderRequest request)
     {
+        var journeyStartedAtUtc = DateTime.UtcNow;
         using var transaction = await dbContext.Database.BeginTransactionAsync();
 
         try
@@ -34,7 +35,8 @@ public class CreateOrderHandler(OrderDbContext dbContext)
                 Type = orderCreatedEvent.GetType().Name,
                 Content = JsonSerializer.Serialize(orderCreatedEvent),
                 OccurredOnUtc = DateTime.UtcNow,
-                TraceParent = Activity.Current?.Id
+                TraceParent = Activity.Current?.Id,
+                JourneyStartedAtUtc = journeyStartedAtUtc
             };
 
             dbContext.OutboxMessages.Add(outboxMessage);

@@ -56,7 +56,7 @@ public class OutboxProcessor : BackgroundService
                         _ => throw new InvalidOperationException($"Unknown event type: {message.Type}")
                     };
 
-                    await _messageBusConnection.PublishAsync(ev, routingKey, "payment.exchange", stoppingToken, activity?.Id);
+                    await _messageBusConnection.PublishAsync(ev, routingKey, "payment.exchange", stoppingToken, activity?.Id, message.JourneyStartedAtUtc);
 
                     message.ProcessedOnUtc = DateTime.UtcNow;
 
