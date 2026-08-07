@@ -17,8 +17,6 @@ public class PaymentRejectedConsumer : BackgroundService
     private const string Queue = "payment.rejected.notifications";
     private const string Event = "payment.rejected";
 
-    private static readonly ActivitySource ActivitySource = new("NotificationService.PaymentRejectedConsumer");
-
     public PaymentRejectedConsumer(ILogger<PaymentRejectedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
     {
         _logger = logger;
@@ -42,7 +40,9 @@ public class PaymentRejectedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
-        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentApprovedEvent", ActivitySource);
+        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentRejectedEvent", Telemetry.ActivitySource);
+
+        var journeyStartedAtUtc = ea.GetJourneyStartedAtUtc();
 
         try
         {
@@ -69,6 +69,14 @@ public class PaymentRejectedConsumer : BackgroundService
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
+        }
+        finally
+        {
+            if (journeyStartedAtUtc.HasValue)
+            {
+                var elapsed = (DateTime.UtcNow - journeyStartedAtUtc.Value).TotalSeconds;
+                Telemetry.JourneyDuration.Record(elapsed);
+            }
         }
     }
 }

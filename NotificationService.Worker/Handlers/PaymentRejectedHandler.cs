@@ -9,11 +9,9 @@ namespace NotificationService.Worker.Handlers;
 
 public class PaymentRejectedHandler(NotificationDbContext dbContext, ILogger<PaymentRejectedHandler> logger)
 {
-    private static readonly ActivitySource ActivitySource = new("NotificationService.PaymentRejectedHandler");
-
     public async Task HandleAsync(PaymentRejectedEvent ev, CancellationToken ct)
     {
-        using var activity = ActivitySource.StartActivity("Handle PaymentRejectedEvent", ActivityKind.Internal);
+        using var activity = Telemetry.ActivitySource.StartActivity("Handle PaymentRejectedEvent", ActivityKind.Internal);
 
         // Validação de idempotência: verifica se o evento já foi processado
         if (await dbContext.ProcessedEvents.AnyAsync(e => e.EventId == ev.EventId, ct))

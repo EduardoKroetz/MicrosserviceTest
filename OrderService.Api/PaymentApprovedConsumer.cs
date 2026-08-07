@@ -17,8 +17,6 @@ public class PaymentApprovedConsumer : BackgroundService
     private const string Queue = "payment.approved.orders";
     private const string Event = "payment.approved";
 
-    private static readonly ActivitySource ActivitySource = new("OrderService.PaymentApprovedConsumer");
-
     public PaymentApprovedConsumer(ILogger<PaymentApprovedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
     {
         _logger = logger;
@@ -42,7 +40,7 @@ public class PaymentApprovedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
-        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentApprovedEvent", ActivitySource);
+        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentApprovedEvent", Telemetry.ActivitySource);
 
         try
         {

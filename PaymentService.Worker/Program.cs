@@ -1,5 +1,6 @@
 using BuildingBlocks;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using PaymentService.Worker;
@@ -14,15 +15,27 @@ builder.Services.AddHostedService<OutboxProcessor>();
 builder.Services.AddDbContext<PaymentDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var oltpEndpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(x => x.AddService("PaymentService"))
+    .ConfigureResource(x => x.AddService(Telemetry.ServiceName))
     .WithTracing(tracing => tracing
-        .AddSource("PaymentService.OrderCreatedConsumer")
-        .AddSource("PaymentService.OrderCreatedHandler")
-        .AddSource("PaymentService.OutboxProcessor")
+        .AddSource(Telemetry.ServiceName)
         .AddOtlpExporter(options =>
         {
-            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+            options.Endpoint = oltpEndpoint;
+        }))
+    .WithMetrics(metrics => metrics
+        .AddMeter(Telemetry.Meter.Name)
+        .AddView(
+            instrumentName: "order_created_handler_duration_seconds",
+            new ExplicitBucketHistogramConfiguration
+            {
+                Boundaries = new double[] { 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.5, 4 }
+            })
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = oltpEndpoint;
         }));
 
 builder.Services.AddSingleton<IConnection>(sp =>

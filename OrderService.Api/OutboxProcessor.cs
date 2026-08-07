@@ -12,7 +12,6 @@ public class OutboxProcessor : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IMessageBusConnection _messageBusConnection;
     private readonly ILogger<OutboxProcessor> _logger;
-    private static readonly ActivitySource ActivitySource = new("OrderService.Outbox");
 
     public OutboxProcessor(IServiceProvider serviceProvider, IMessageBusConnection messageBusConnection, ILogger<OutboxProcessor> logger)
     {
@@ -45,7 +44,7 @@ public class OutboxProcessor : BackgroundService
                     _logger.LogWarning("Failed to parse TraceParent for message {EventId}. Starting a new activity.", message.EventId);
                 }
 
-                using var activity = ActivitySource.StartActivity("Publish OrderCreatedEvent", ActivityKind.Producer, activityContext);
+                using var activity = Telemetry.ActivitySource.StartActivity("Publish OrderCreatedEvent", ActivityKind.Producer, activityContext);
 
                 try
                 {
@@ -55,7 +54,7 @@ public class OutboxProcessor : BackgroundService
                         _ => throw new InvalidOperationException($"Unknown event type: {message.Type}")
                     };
 
-                    await _messageBusConnection.PublishAsync(ev, routingKey, exchange, stoppingToken, activity?.Id);
+                    await _messageBusConnection.PublishAsync(ev, routingKey, exchange, stoppingToken, activity?.Id, message.JourneyStartedAtUtc);
 
                     message.ProcessedOnUtc = DateTime.UtcNow;
 

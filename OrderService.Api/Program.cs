@@ -1,5 +1,6 @@
 using BuildingBlocks;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OrderService.Api;
@@ -20,19 +21,26 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddDbContext<OrderDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var oltpEndpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(x => x.AddService("OrderService"))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddSource("OrderService.Outbox")
-        .AddSource("OrderService.PaymentApprovedConsumer")
-        .AddSource("OrderService.PaymentRejectedConsumer")
-        .AddSource("OrderService.PaymentApprovedHandler")
-        .AddSource("OrderService.PaymentRejectedHandler")
+        .AddSource(Telemetry.ServiceName)
         .AddOtlpExporter(options =>
         {
-            options.Endpoint = new Uri(builder.Configuration["OpenTelemetry:OltpEndpoint"] ?? throw new InvalidOperationException("OpenTelemetry OltpEndpoint is not configured"));
+            options.Endpoint = oltpEndpoint;
+        }))
+    .WithMetrics(metrics => metrics
+        .AddMeter(Telemetry.ServiceName)
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter((exporterOptions, readerOptions) =>
+        {
+            exporterOptions.Endpoint = oltpEndpoint;
+            readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 5000;
         }));
 
 builder.Services.AddSingleton<IConnection>(sp =>
@@ -61,9 +69,13 @@ builder.Services.AddHostedService<OutboxProcessor>();
 
 var app = builder.Build();
 
-using var scope = app.Services.CreateScope();
+var scopeFactory = app.Services.GetRequiredService<IServiceScopeFactory>();
+
+using var scope = scopeFactory.CreateScope();
 var dbContext = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
 await dbContext.Database.MigrateAsync();
+
+Telemetry.ConfigureGauges(scopeFactory);
 
 app.UseHttpsRedirection();
 

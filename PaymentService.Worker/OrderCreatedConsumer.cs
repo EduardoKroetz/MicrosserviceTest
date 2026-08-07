@@ -17,8 +17,6 @@ public class OrderCreatedConsumer : BackgroundService
     private const string Queue = "order.created.payments";
     private const string Event = "order.created";
 
-    private static readonly ActivitySource ActivitySource = new("PaymentService.OrderCreatedConsumer");
-
     public OrderCreatedConsumer(ILogger<OrderCreatedConsumer> logger, IMessageBusConnection messageBusConnection, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
@@ -42,7 +40,8 @@ public class OrderCreatedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
-        using var activity = ea.CreateActivityFromEventArgs("Consume OrderCreatedEvent", ActivitySource);
+        using var activity = ea.CreateActivityFromEventArgs("Consume OrderCreatedEvent", Telemetry.ActivitySource);
+        var journeyStartedAtUtc = ea.GetJourneyStartedAtUtc();
 
         try
         {
@@ -55,19 +54,23 @@ public class OrderCreatedConsumer : BackgroundService
 
             using var scope = _scopeFactory.CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<OrderCreatedHandler>();
-            await handler.HandleAsync(ev);
+            await handler.HandleAsync(ev, journeyStartedAtUtc);
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+
+            Telemetry.MessagesProcessed.Add(1, new KeyValuePair<string, object?>("status", "processed"));
         }
         catch (JsonException ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+            Telemetry.MessagesProcessed.Add(1, new KeyValuePair<string, object?>("status", "failed"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Falha ao processar {MessageId}", messageId);
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            Telemetry.MessagesProcessed.Add(1, new KeyValuePair<string, object?>("status", "failed"));
 
             await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true);
         }

@@ -17,8 +17,6 @@ public class PaymentRejectedConsumer : BackgroundService
     private const string Queue = "payment.rejected.orders";
     private const string Event = "payment.rejected";
 
-    private static readonly ActivitySource ActivitySource = new("OrderService.PaymentRejectedConsumer");
-
     public PaymentRejectedConsumer(ILogger<PaymentRejectedConsumer> logger, IServiceScopeFactory serviceScopeFactory, IMessageBusConnection messageBusConnection)
     {
         _logger = logger;
@@ -42,7 +40,7 @@ public class PaymentRejectedConsumer : BackgroundService
         var channel = ((AsyncEventingBasicConsumer)sender).Channel;
         var messageId = ea.BasicProperties.MessageId;
 
-        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentRejectedEvent", ActivitySource);
+        using var activity = ea.CreateActivityFromEventArgs("Consume PaymentRejectedEvent", Telemetry.ActivitySource);
 
         try
         {
